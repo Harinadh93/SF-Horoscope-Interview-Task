@@ -1,0 +1,178 @@
+Javascript
+-----------------
+({
+	captureUserInput : function(component, event, helper) {
+		var sign = event.getSource().get("v.value");
+        component.set("v.sign", sign);
+	},
+    
+    captureUserInput2 : function(component, event, helper) {
+		var day = event.getSource().get("v.value");
+        component.set("v.day", day);
+	}
+})
+
+Apex
+----------------------------
+
+global class astroRestIntegration {
+	//POST Operation in REST API
+    @AuraEnabled
+    global static List<string> astroResponse(string sign,string day) {
+        List<string> astroData = new List<string>();
+        string data;
+        Http h2 = new Http();
+        HttpRequest req2 = new HttpRequest();
+        req2.setMethod('POST');
+        req2.setHeader('Content-Type','application/json; charset=UTF-8');
+        req2.setHeader('Accept','application/json');
+        req2.setEndpoint('https://aztro.sameerkumar.website/?sign='+sign+'&day='+day);
+        HttpResponse res2 = h2.send(req2);
+        data = res2.getBody();
+        System.debug(data);
+        wrapperAstro objAuthenticationInfo = (wrapperAstro)JSON.deserialize(res2.getbody(), wrapperAstro.class);
+        astroData.add(objAuthenticationInfo.date_range);
+        astroData.add(objAuthenticationInfo.current_date);
+        astroData.add(objAuthenticationInfo.description);
+        astroData.add(objAuthenticationInfo.compatibility);
+        astroData.add(objAuthenticationInfo.mood);
+        astroData.add(objAuthenticationInfo.color);
+        astroData.add(objAuthenticationInfo.lucky_number);
+        astroData.add(objAuthenticationInfo.lucky_time);
+        System.debug(astroData);
+        return astroData;
+	}
+    
+    //Wrapper class
+    global class wrapperAstro{
+        public String date_range;
+        public String current_date;
+        public String description;
+        public String compatibility;
+        public String mood;
+        public String color;
+        public String lucky_number;
+        public String lucky_time;
+    }
+}
+
+Component
+--------------
+
+<aura:component controller="IntegrateAccountRestController" implements="force:appHostable,flexipage:availableForAllPageTypes,flexipage:availableForRecordHome,force:hasRecordId,forceCommunity:availableForAllPageTypes,force:lightningQuickAction" access="global" >
+    <aura:attribute name="sign" type="String"/>
+    <aura:attribute name="day" type="String"/>
+    <lightning:card>    
+    <div class="slds-grid slds-wrap">
+            <div class="slds-col slds-size_6-of-12">
+                <div class="slds-p-around_x-small">
+                        <lightning:select name="Sign" label="Select a sign" onchange="{!c.captureUserInput}" required="true">
+                            <option value="">Select a sign...</option>
+                            <option value="aries">Aries</option>
+                            <option value="taurus">Taurus</option>
+                            <option value="gemini">Gemini</option>
+                            <option value="cancer">Cancer</option>
+                            <option value="leo">Leo</option>
+                            <option value="virgo">Virgo</option>
+                            <option value="libra">Libra</option>
+                            <option value="scorpio">Scorpio</option>
+                            <option value="sagittarius">Sagittarius</option>
+                            <option value="capricorn">Capricorn</option>
+                            <option value="aquarius">Aquarius</option>
+                            <option value="pisces">Pisces</option>
+                    </lightning:select>
+                    <lightning:select name="Day" label="Select which day" onchange="{!c.captureUserInput2}" required="true">
+                        <option value="">Select which day...</option>
+                        <option value="today">Today</option>
+                        <option value="tomorrow">Tomorrow</option>
+                        <option value="yesterday">Yesterday</option>
+                    </lightning:select>
+                </div>
+            </div>
+            <div class="slds-col slds-size_6-of-12">
+                <c:restLWCApp auraSign="{!v.sign}" auraDay="{!v.day}"></c:restLWCApp>
+            </div>
+        </div>
+        </lightning:card>
+</aura:component>
+
+LWC
+------------------------------
+<template>
+	<div style="align-items:center !important;">
+                <template if:true={isData}>
+                    <lightning-card>
+                        <div if:true={isSpin}>
+                            <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+                        </div>
+                        <div style="text-align:center;">
+                            <!-- <p>Date Range: {date_range}</p> <br> -->
+                            <p style="font-size: 25px;">Your horoscope for {current_date}</p><br>
+                            <p style="color:orange; font-size:18px;"><i>{description}</i></p> <br>
+                            <div style="font-size:15px;">
+                                <p>Your compatible star sign: {compatibility}</p> <br>
+                                <p>Your mood: {mood}</p> <br>
+                                <p>Your lucky color: {color}</p> <br>
+                                <p>Your lucky number: {lucky_number}</p> <br>
+                                <p>Your lucky time: {lucky_time}</p>
+                            </div>
+                        </div>
+                    </lightning-card>
+                </template>
+                <template if:true={isError}>
+                    <lightning-card>
+                        <p>{error}</p>
+                    </lightning-card>
+                </template>
+            </div>
+      <span style="visibility: hidden;">{auraSign}&nbsp;&nbsp;{auraDay}</span>
+</template>
+
+Javascript
+----------------------
+import { LightningElement,api,wire } from 'lwc';
+import getAstroData from '@salesforce/apex/astroRestIntegration.astroResponse';
+
+export default class RestLWCApp extends LightningElement {
+    sign;
+    day;
+    isData = false;
+    date_range;
+    current_date;
+    description;
+    compatibility;
+    mood;
+    color;
+    lucky_number;
+    lucky_time;
+    error;
+    isError = false;
+    isSpin = true;
+    @api auraSign;
+    @api auraDay;
+
+    renderedCallback(){
+        if(this.auraSign && this.auraDay){
+            getAstroData({sign: this.auraSign,day: this.auraDay})
+                .then(result=>{
+                        this.isData = true;
+                        this.isError = false;
+                        this.isSpin = false;
+                        this.date_range = result[0];
+                        this.current_date = result[1];
+                        this.description = result[2];
+                        this.compatibility = result[3];
+                        this.mood = result[4];
+                        this.color = result[5];
+                        this.lucky_number = result[6];
+                        this.lucky_time = result[7];
+                })
+                .catch(error=>{
+                    this.isError = true;
+                    this.isData = false;
+                    this.error = 'You entered wrong values please check'+JSON.stringify(error);
+                })
+        }
+    }
+
+}
